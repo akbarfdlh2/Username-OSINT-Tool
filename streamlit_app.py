@@ -30,15 +30,58 @@ CAT_COLORS = {
 st.markdown(
     """
     <style>
-      .block-container { max-width: 1100px; padding-top: 2rem; }
+      .stApp {
+        background:
+          radial-gradient(1200px 600px at 80% -10%, rgba(88,166,255,.10), transparent 60%),
+          radial-gradient(900px 500px at -10% 10%, rgba(63,185,80,.08), transparent 55%),
+          #0b0f17;
+      }
+      .block-container { max-width: 1040px; padding-top: 2.5rem; }
+
+      /* Search card wrapper around the form */
+      div[data-testid="stForm"] {
+        background:linear-gradient(180deg,#141b2b,#0d1320);
+        border:1px solid #26314a; border-radius:14px;
+        box-shadow:0 8px 30px rgba(0,0,0,.35); padding:22px;
+      }
+      /* Username input */
+      div[data-testid="stForm"] input {
+        background:#0b0f17 !important; border:1px solid #33415f !important;
+        color:#e8eef7 !important; border-radius:10px !important; font-size:16px !important;
+        padding:12px 14px !important;
+      }
+      div[data-testid="stForm"] input:focus {
+        border-color:#58a6ff !important; box-shadow:0 0 0 3px rgba(88,166,255,.18) !important;
+      }
+      /* Advanced options expander — flatten it inside the card */
+      div[data-testid="stForm"] details {
+        background:transparent !important; border:0 !important; box-shadow:none !important;
+      }
+      div[data-testid="stForm"] summary { color:#58a6ff !important; font-size:13px; }
+
+      /* Scan button */
+      div[data-testid="stForm"] button[kind="primaryFormSubmit"] {
+        background:linear-gradient(180deg,#3fb950,#2ea043) !important; color:#04210b !important;
+        border:0 !important; font-weight:700 !important; border-radius:10px !important;
+      }
+      div[data-testid="stForm"] button[kind="primaryFormSubmit"]:hover { filter:brightness(1.06); }
+
       .tile {
         background:#141b2b; border:1px solid #26314a; border-radius:12px;
-        padding:14px 15px; margin-bottom:10px;
+        padding:14px 15px; margin-bottom:10px; transition:border-color .15s, transform .15s;
       }
-      .tile .pname { font-weight:700; font-size:15px; }
+      .tile:hover { border-color:#3fb950; transform:translateY(-2px); }
+      .tile .pname { font-weight:700; font-size:15px; display:flex; align-items:center; gap:8px; }
+      .tile .dot { width:8px; height:8px; border-radius:50%; background:#3fb950; box-shadow:0 0 8px #3fb950; display:inline-block; }
       .tile a { color:#58a6ff; text-decoration:none; font-size:13px; word-break:break-all; }
       .tile a:hover { text-decoration:underline; }
       .badge { font-size:11px; padding:3px 9px; border-radius:999px; font-weight:700; }
+      .group-title {
+        display:flex; align-items:center; gap:10px;
+        font-size:13px; font-weight:700; color:#8b98b0;
+        text-transform:uppercase; letter-spacing:.7px; margin:22px 0 12px;
+      }
+      .group-title::after { content:""; flex:1; height:1px; background:#26314a; }
       .credit { text-align:center; color:#8b98b0; font-size:13px; line-height:1.9; }
       .credit a { color:#58a6ff; text-decoration:none; }
       .credit .name { color:#e8eef7; font-weight:700; }
@@ -94,11 +137,16 @@ st.caption(
 )
 
 with st.form("scan_form"):
-    c1, c2, c3 = st.columns([3, 1, 1])
-    username = c1.text_input("Username", placeholder="mis. johndoe", label_visibility="collapsed")
-    timeout = c2.number_input("Timeout (s)", 1, 60, 10)
-    concurrency = c3.number_input("Paralel", 1, 200, 50)
+    username = st.text_input(
+        "Username",
+        placeholder="@ masukkan username, mis. johndoe",
+        label_visibility="collapsed",
+    )
     submitted = st.form_submit_button("🔎 Scan", type="primary", use_container_width=True)
+    with st.expander("⚙ Opsi lanjutan"):
+        c1, c2 = st.columns(2)
+        timeout = c1.number_input("Timeout (detik)", 1, 60, 10)
+        concurrency = c2.number_input("Request paralel", 1, 200, 50)
 
 if submitted and username.strip():
     username = username.strip()
@@ -142,16 +190,24 @@ if submitted and username.strip():
         st.info(f"Username **@{username}** tidak terdeteksi di platform manapun.")
     else:
         st.subheader(f"Ditemukan di {len(found)} platform")
-        cols = st.columns(2)
-        for i, r in enumerate(found):
-            with cols[i % 2]:
-                st.markdown(
-                    f"<div class='tile'>"
-                    f"<div class='pname'>🟢 {r['platform']} {badge(r['category'])}</div>"
-                    f"<a href='{r['url']}' target='_blank'>{r['url']}</a>"
-                    f"</div>",
-                    unsafe_allow_html=True,
-                )
+        from itertools import groupby
+
+        for category, group in groupby(found, key=lambda x: x["category"]):
+            items = list(group)
+            st.markdown(
+                f"<div class='group-title'>{category} ({len(items)})</div>",
+                unsafe_allow_html=True,
+            )
+            cols = st.columns(2)
+            for i, r in enumerate(items):
+                with cols[i % 2]:
+                    st.markdown(
+                        f"<div class='tile'>"
+                        f"<div class='pname'><span class='dot'></span>{r['platform']} {badge(r['category'])}</div>"
+                        f"<a href='{r['url']}' target='_blank'>{r['url']}</a>"
+                        f"</div>",
+                        unsafe_allow_html=True,
+                    )
 
     def detail_table(title, items, cols=("Platform", "Info", "URL")):
         if not items:
